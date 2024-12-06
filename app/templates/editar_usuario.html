@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block titulo %}Editar Usuario{% endblock %}
 {% block main %}
-<div class="container-fluid d-flex justify-content-center align-items-center" style="min-height: 100vh;">
+<div class="container-fluid d-flex justify-content-center align-items-center" style="min-height: 50vh;">
     <div class="row justify-content-center">
         <div class="text-left">
             <h1 class="mb-4">Editar Usuario</h1>
@@ -25,15 +25,4 @@
     </div>
 </div>
 
-
-
-<!-- <div class="container col-6 mt-5">
-    <h1 class="mb-4">Editar Usuario</h1> <br>
-    <form method="post">
-        {% csrf_token %}
-        {{ form }}
-        <br>
-        <input type="submit" value="Atualizar" class="btn botaoC">
-    </form>
-</div> -->
 {% endblock %}

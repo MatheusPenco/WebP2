@@ -3,23 +3,28 @@ import uuid
 
 
 def rename_image(instance, filename):
-    ext = filename.split('.')[-1]  # Obtém a extensão do arquivo
-    # Gera um nome único para o arquivo com base em UUID e adiciona a extensão
+    ext = filename.split('.')[-1]
     return f'imagens/courses/{uuid.uuid4()}.{ext}'
-# Create your models here.
+
 class Usuario(models.Model):
     nome = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
     senha = models.CharField(max_length=255)
     imagem = models.ImageField(upload_to='imagens/users/', null=True)
 
-class Curso(models.Model):
-    nome = models.CharField(max_length=255)
-    autor = models.CharField(max_length=255)
-    duracao = models.CharField(max_length=255)
-    preco = models.DecimalField(max_digits=10, decimal_places=2)
-    imagem = models.ImageField(upload_to='imagens/courses/', null=True)
-
 class Foto(models.Model):
     titulo = models.CharField(max_length=100)
     imagem = models.ImageField(upload_to='imagens/', null=True)
+
+
+class Gato(models.Model):
+    id = models.AutoField(primary_key=True)
+    nome = models.CharField(max_length=100)
+    idade = models.IntegerField()
+    raca = models.CharField(max_length=100)
+    imagem = models.ImageField(upload_to='imagens/gatos/', null=True)
+
+class Adocoes(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    gato = models.ForeignKey(Gato, on_delete=models.CASCADE)
+    data_adocao = models.DateField(auto_now_add=True)

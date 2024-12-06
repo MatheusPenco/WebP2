@@ -1,30 +1,34 @@
+import base64
 from datetime import timedelta
+import io
 from django.http import HttpResponse
 from django.shortcuts import render,get_object_or_404,redirect
-from aplicativo.form_cadastro_user import FormCadastroUser,FormCadastroCurso,FormLogin,FormAlterarSenha,FotoForm
+import urllib
+from app.forms import formCadastro, formCadastroGato, formFoto, formLogin
 from django.contrib.auth.hashers import make_password,check_password
 from django.contrib import messages
-from aplicativo.models import Usuario,Curso,Foto
+from app.models import Foto, Gato, Usuario, Adocoes
 from django.contrib.auth import get_user_model,update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.template import loader
+import matplotlib.pyplot as plt
+from django.utils.timezone import now
+
 
 # Create your views here.
+
 def home(request):
-    return render(request,"index.html")
+    return render(request,"home.html")
 
-
-def cadastrar_user(request):
-    novo_user = FormCadastroUser(request.POST, request.FILES)
+def cadastro(request):
+    novo_user = formCadastro(request.POST, request.FILES)
 
     if request.method == 'POST':
         email = request.POST.get('email')
-        # Verificar se o e-mail já existe
         if Usuario.objects.filter(email=email).exists():
             messages.error(request, "E-mail já cadastrado.")
         elif novo_user.is_valid():
             user = novo_user.save(commit=False)
-            # Criptografar a senha usando make_password
             user.senha = make_password(novo_user.cleaned_data['senha'])
             user.save()
             messages.success(request, "Usuário cadastrado com sucesso")
@@ -33,39 +37,8 @@ def cadastrar_user(request):
     context = {'form': novo_user}
     return render(request, "cadastro.html", context)
 
-def exibir_usuario(request):
-   usuarios = Usuario.objects.all().values()
-
-   context = {
-      'dados' : usuarios
-   }
-   return render(request,'usuarios.html',context)
-
-def cadastrar_curso(request):
-    if request.method == 'POST':
-        # Instanciando o formulário com os dados do POST e o arquivo da imagem
-        form = FormCadastroCurso(request.POST, request.FILES)
-        
-        # Verificando se o formulário é válido
-        if form.is_valid():
-            form.save()  # Salvando o novo curso no banco de dados
-            messages.success(request, "Curso cadastrado com sucesso!")  # Mensagem de sucesso
-            return redirect('home')  # Redireciona para a página inicial
-    else:
-        form = FormCadastroCurso()  # Formulário vazio em caso de GET
-
-    return render(request, 'cadastroCurso.html', {'form': form})
-
-def exibir_curso(request):
-   cursos = Curso.objects.all().values()
-
-   context = {
-      'dados' : cursos
-   }
-   return render(request,'cursos.html',context)
-
-def form_login(request):
-   formLogin = FormLogin(request.POST or None)
+def login(request):
+   form_login = formLogin(request.POST or None)
    if request.POST:
       _email = request.POST['email']
       _senha = request.POST['senha']
@@ -73,9 +46,7 @@ def form_login(request):
       try:
          usuario = Usuario.objects.get(email = _email)      
          if check_password(_senha,usuario.senha):
-            #Define o tempo da sessao em segundos
             request.session.set_expiry(timedelta(seconds=1800))
-            #Variacel de sessao
             request.session['email'] = _email
             messages.success(request,"Usuario logado com sucesso")
             return redirect('dashboard')
@@ -83,16 +54,16 @@ def form_login(request):
             messages.error("Senha incorreta")
       except:
             messages.error(request, 'Usuario não encontrado!')
-            return redirect('form_login')
+            return redirect('login')
             
    context = {
-      'form' : formLogin
+      'form' : form_login
    }
-   return render(request,'form-login.html',context)
+   return render(request,'login.html',context)
 
 def dashboard(request):
     if 'email' not in request.session:
-        return redirect('form_login')
+        return redirect('login')
 
     # Obtém o usuário logado
     usuario_logado = Usuario.objects.get(email=request.session['email'])
@@ -106,9 +77,52 @@ def dashboard(request):
     return HttpResponse(template.render(context))
 
 
+def cadastroGato(request):
+    if request.method == 'POST':
+        form = formCadastroGato(request.POST, request.FILES)
+        if form.is_valid():
+            form.save() 
+            messages.success(request, "Gato cadastrado com sucesso!")
+            return redirect('home') 
+    else:
+        form = formCadastroGato() 
+
+    return render(request, 'cadastroGato.html', {'form': form})
+
+def gatos(request):
+   gatos = Gato.objects.all().values()
+
+   context = {
+      'dados' : gatos
+   }
+   return render(request,'gatos.html',context)
+
+def criar_foto(request):
+    if request.method == 'POST':
+        form = formFoto(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('galeria')
+    else:
+        form = formFoto()
+
+    return render(request, 'criar_foto.html', {'form': form})
+
+def usuarios(request):
+   usuarios = Usuario.objects.all().values()
+
+   context = {
+      'dados' : usuarios
+   }
+   return render(request,'usuarios.html',context)
+
+def pagina_sucesso(request):
+   return render(request,'pagina_sucesso.html')
+
+
 def editar_usuario(request,id_usuario):
    usuario = Usuario.objects.get(id=id_usuario)
-   form = FormCadastroUser(request.POST or None,instance=usuario)
+   form = formCadastro(request.POST or None,instance=usuario)
    if request.POST:
       if form.is_valid():
          form.save()
@@ -124,35 +138,6 @@ def excluir_usuario(request,id_usuario):
    usuario.delete()
    return redirect('exibir_usuario')
 
-def redefinir_senha(request, id_usuario):
-    user = get_object_or_404(Usuario, id=id_usuario)  # Obtém o usuário pelo ID
-    if request.method == 'POST':
-        form = FormAlterarSenha(user, request.POST)
-        if form.is_valid():
-            user = form.save()
-            update_session_auth_hash(request, user)  # Mantém o usuário logado
-            messages.success(request, 'Senha alterada com sucesso!')
-            return redirect('dashboard')  # Redirecione para a página desejada
-    else:
-        form = FormAlterarSenha(user)
-
-    return render(request, 'redefinir_senha.html', {'form': form, 'user': user})
-
-def criar_foto(request):
-    if request.method == 'POST':
-        form = FotoForm(request.POST, request.FILES)
-        if form.is_valid():
-            form.save()
-            return redirect('galeria')
-    else:
-        form = FotoForm()  # Esse formulário será exibido em uma requisição GET
-
-    return render(request, 'criar_foto.html', {'form': form})
-
-def pagina_sucesso(request):
-    return render(request, 'pagina_sucesso.html')
-
-#Mostra as fotos
 def mostrar_fotos(request):
     fotos = Foto.objects.all()
 
@@ -162,3 +147,62 @@ def mostrar_fotos(request):
 
     return render(request, "galeria.html", context)
 
+def exibir_usuario(request):
+   usuarios = Usuario.objects.all().values()
+
+   context = {
+      'dados' : usuarios
+   }
+   return render(request,'usuarios.html',context)
+
+def grafico(request):
+    gatos = Gato.objects.all().values()
+    nomes = [gato['nome'] for gato in gatos]
+    idades = [gato['idade'] for gato in gatos]
+
+    fig, xy = plt.subplots()
+    xy.bar(nomes,idades)
+    xy.set_xlabel('Nomes dos gatos')
+    xy.set_ylabel('Idades dos gatos')
+    xy.set_title('Gatos')
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+
+    string = base64.b64encode(buf.read())
+    uri = 'data:image/png;base64,' + urllib.parse.quote(string)
+
+    context = {
+        'data' : uri
+    }
+
+    return render(request,'grafico.html',context)
+
+def adocao(request, gato_id):
+    User = get_user_model()
+    usuario = request.user
+
+    gato = get_object_or_404(Gato, id=gato_id)
+
+    if request.method == 'POST':
+        adocao = Adocoes(usuario=usuario, gato=gato)
+        adocao.save()
+        
+        messages.success(request, f"Parabéns! Você adotou o gato {gato.nome}.")
+        return redirect('gatos_disponiveis')
+
+    context = {
+        'gato': gato,
+    }
+    return render(request, 'adocao.html', context)
+
+def gatos_disponiveis(request):
+    gatos_disponiveis = Gato.objects.exclude(id__in=Adocoes.objects.values('gato'))
+    quantidade_gatos = gatos_disponiveis.count()
+
+    context = {
+        'gatos': gatos_disponiveis,
+        'quantidade': quantidade_gatos,
+    }
+    return render(request, 'gatos.html', context)
